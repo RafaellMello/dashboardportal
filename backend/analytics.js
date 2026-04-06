@@ -7,7 +7,16 @@
 
 const fs = require('fs');
 
-console.log('EXISTE JSON?', fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS));
+console.log('[DEBUG] GOOGLE_APPLICATION_CREDENTIALS:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
+console.log('[DEBUG] JSON existe?', fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS));
+
+try {
+  const content = fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8');
+  console.log('[DEBUG] Conteúdo parcial:', content.slice(0, 100)); // mostra só os 100 primeiros caracteres
+} catch (err) {
+  console.error('[DEBUG] Erro ao ler JSON:', err.message);
+}
+
 
 const USE_MOCK = !process.env.GA4_PROPERTY_ID; // troca para false quando configurar o GA4
 
