@@ -131,10 +131,8 @@ function renderDashboard(data) {
 
 /* ── Cards de métricas ───────────────────────────────────────────── */
 function renderCards(summary) {
-  countUp('totalSessions', summary.totalSessions);
-  countUp('uniqueUsers',   summary.uniqueUsers);
-  countUp('pageviews',     summary.pageviews);
-
+  countUp('totalAccesses', summary.totalAccesses); // 🔥 principal
+  countUp('sessions',      summary.sessions);      // secundário
   document.getElementById('avgDuration').textContent = summary.avgSessionDuration || '—';
 
   // Taxa de crescimento com cor
