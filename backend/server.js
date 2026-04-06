@@ -3,7 +3,6 @@
  * Backend: Express + Google Analytics Data API (GA4)
  */
 
-// Carrega variáveis do .env ANTES de qualquer outro require
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 
 const express = require('express');
@@ -55,19 +54,26 @@ function resolveDateRange(period, startDate, endDate) {
   const fmt = (d) => d.toISOString().split('T')[0];
 
   switch (period) {
-    case '7days':
-      return { startDate: 'today', endDate: 'today', daysAgo: 7 };
-    case '30days':
-      return { startDate: '30daysAgo', endDate: 'today', daysAgo: 30 };
+    case '7days': {
+      const start = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000); // últimos 7 dias
+      return { startDate: fmt(start), endDate: fmt(today) };
+    }
+    case '30days': {
+      const start = new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000); // últimos 30 dias
+      return { startDate: fmt(start), endDate: fmt(today) };
+    }
     case 'thisMonth': {
       const first = new Date(today.getFullYear(), today.getMonth(), 1);
       return { startDate: fmt(first), endDate: fmt(today) };
     }
     case 'custom':
-      if (!startDate || !endDate) throw new Error('startDate e endDate são obrigatórios para period=custom');
+      if (!startDate || !endDate) {
+        throw new Error('startDate e endDate são obrigatórios para period=custom');
+      }
       return { startDate, endDate };
     default:
-      return { startDate: '30daysAgo', endDate: 'today' };
+      const defaultStart = new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000);
+      return { startDate: fmt(defaultStart), endDate: fmt(today) };
   }
 }
 

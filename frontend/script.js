@@ -15,8 +15,7 @@ const state = {
   firstLoad: true,
 };
 
-// Se aberto via file:// ou porta diferente, usa mock embutido
-const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
+/* ── Configura API base ────────────────────────────────────────────── */
 const API_BASE = window.location.origin;
 
 /* ── Paleta compartilhada com o CSS ──────────────────────────────── */
@@ -57,7 +56,8 @@ document.addEventListener('DOMContentLoaded', () => {
       break;
   }
 
-  // Chama fetch inicial
+  setupPeriodFilter();
+  setupManualRefresh();
   fetchAndRender();
 });
 
@@ -99,22 +99,19 @@ function setupPeriodFilter() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   FETCH PRINCIPAL
+   FETCH PRINCIPAL (AGORA GET COM QUERY STRING)
    ════════════════════════════════════════════════════════════════════ */
 async function fetchAndRender() {
   if (state.firstLoad) showSkeleton(true);
   setRefreshRing(true);
 
   try {
-    const body = { period: state.period };
-if (state.startDate) body.startDate = state.startDate;
-if (state.endDate)   body.endDate   = state.endDate;
+    const params = new URLSearchParams({ period: state.period });
+    if (state.startDate) params.set('startDate', state.startDate);
+    if (state.endDate)   params.set('endDate',   state.endDate);
+    const url = `${API_BASE}/api/analytics?${params.toString()}`;
 
-const res = await fetch(`${API_BASE}/api/analytics`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(body),
-});
+    const res = await fetch(url); // GET por padrão
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
 
@@ -134,13 +131,6 @@ const res = await fetch(`${API_BASE}/api/analytics`, {
   }
 }
 
-function buildQueryParams() {
-  const p = new URLSearchParams({ period: state.period });
-  if (state.startDate) p.set('startDate', state.startDate);
-  if (state.endDate)   p.set('endDate',   state.endDate);
-  return p.toString();
-}
-
 /* ════════════════════════════════════════════════════════════════════
    RENDER PRINCIPAL
    ════════════════════════════════════════════════════════════════════ */
@@ -154,18 +144,17 @@ function renderDashboard(data) {
 
 /* ── Cards de métricas ───────────────────────────────────────────── */
 function renderCards(summary) {
-  countUp('totalAccesses', summary.totalAccesses); // 🔥 principal
-  countUp('sessions',      summary.sessions);      // secundário
+  countUp('totalAccesses', summary.totalAccesses);
+  countUp('sessions',      summary.sessions);
   document.getElementById('avgDuration').textContent = summary.avgSessionDuration || '—';
 
-  // Taxa de crescimento com cor
   const growthEl = document.getElementById('growthRate');
   const growth   = parseFloat(summary.growthRate);
   growthEl.textContent = summary.growthRate;
   growthEl.className   = 'metric-growth ' + (growth >= 0 ? 'positive' : 'negative');
 }
 
-/* ── Gráfico de linha: tendência mensal ──────────────────────────── */
+/* ── Gráficos ──────────────────────────────────────────── */
 function renderTrendChart(monthlyData) {
   const labels   = monthlyData.map(d => `${d.month}/${String(d.year).slice(2)}`);
   const sessions = monthlyData.map(d => d.sessions);
@@ -201,17 +190,13 @@ function renderTrendChart(monthlyData) {
     },
     options: {
       ...defaultOptions(),
-      scales: {
-        x: xScale(),
-        y: yScale(),
-      },
+      scales: { x: xScale(), y: yScale() },
     },
   };
 
   updateChart('trendChart', cfg);
 }
 
-/* ── Gráfico de pizza: origem de tráfego ─────────────────────────── */
 function renderSourceChart(sources) {
   const labels = sources.map(s => s.source);
   const values = sources.map(s => s.sessions);
@@ -237,9 +222,7 @@ function renderSourceChart(sources) {
         ...defaultOptions().plugins,
         legend: { display: false },
         tooltip: {
-          callbacks: {
-            label: (ctx) => ` ${ctx.label}: ${fmtNum(ctx.raw)} sessões`,
-          },
+          callbacks: { label: (ctx) => ` ${ctx.label}: ${fmtNum(ctx.raw)} sessões` },
         },
       },
     },
@@ -247,7 +230,6 @@ function renderSourceChart(sources) {
 
   updateChart('sourceChart', cfg);
 
-  // Legenda personalizada
   const legendEl = document.getElementById('sourceLegend');
   legendEl.innerHTML = sources.map((s, i) => `
     <div class="source-item">
@@ -258,7 +240,6 @@ function renderSourceChart(sources) {
   `).join('');
 }
 
-/* ── Gráfico de barras: top páginas ──────────────────────────────── */
 function renderPagesChart(pages) {
   const labels   = pages.map(p => p.page);
   const pageviews = pages.map(p => p.pageviews);
@@ -270,10 +251,7 @@ function renderPagesChart(pages) {
       datasets: [{
         label: 'Visualizações',
         data: pageviews,
-        backgroundColor: pageviews.map((_, i) => {
-          const alpha = 1 - (i * 0.08);
-          return `rgba(59,126,255,${alpha})`;
-        }),
+        backgroundColor: pageviews.map((_, i) => `rgba(59,126,255,${1 - i*0.08})`),
         borderColor: COLOR.primary,
         borderWidth: 0,
         borderRadius: 8,
@@ -293,7 +271,6 @@ function renderPagesChart(pages) {
   updateChart('pagesChart', cfg);
 }
 
-/* ── Comparativo mês a mês ───────────────────────────────────────── */
 function renderComparison(comparison) {
   if (!comparison?.current || !comparison?.previous) return;
 
@@ -307,7 +284,6 @@ function renderComparison(comparison) {
   document.getElementById('curVal').textContent    = fmtNum(current.value);
   document.getElementById('prevVal').textContent   = fmtNum(previous.value);
 
-  // Animação nas barras
   setTimeout(() => {
     document.getElementById('curBar').style.width  = pctCur  + '%';
     document.getElementById('prevBar').style.width = pctPrev + '%';
@@ -316,16 +292,14 @@ function renderComparison(comparison) {
   const g = parseFloat(growth);
   const growEl = document.getElementById('compareGrowth');
   growEl.textContent = `${g >= 0 ? '↑ +' : '↓ '}${growth}% em relação ao mês anterior`;
-  growEl.className   = 'compare-growth ' + (g < 0 ? 'negative' : '');
+  growEl.className = 'compare-growth ' + (g < 0 ? 'negative' : '');
 }
 
 /* ════════════════════════════════════════════════════════════════════
    HELPERS DE CHARTS
    ════════════════════════════════════════════════════════════════════ */
 function updateChart(id, cfg) {
-  if (state.charts[id]) {
-    state.charts[id].destroy();
-  }
+  if (state.charts[id]) state.charts[id].destroy();
   const canvas = document.getElementById(id);
   if (!canvas) return;
   state.charts[id] = new Chart(canvas, cfg);
@@ -360,36 +334,27 @@ function defaultOptions() {
         titleFont: { family: 'DM Sans', size: 12 },
         bodyFont:  { family: 'DM Sans', size: 12 },
         padding: 10,
-        callbacks: {
-          label: (ctx) => ` ${ctx.dataset.label}: ${fmtNum(ctx.raw)}`,
-        },
+        callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${fmtNum(ctx.raw)}` },
       },
     },
   };
 }
 
 function xScale() {
-  return {
-    grid: { color: 'rgba(255,255,255,.04)', drawBorder: false },
-    ticks: { color: COLOR.textSec, font: { family: 'DM Sans', size: 11 } },
-    border: { display: false },
-  };
+  return { grid: { color: 'rgba(255,255,255,.04)', drawBorder: false },
+           ticks: { color: COLOR.textSec, font: { family: 'DM Sans', size: 11 } },
+           border: { display: false } };
 }
 
 function yScale() {
-  return {
-    grid: { color: 'rgba(255,255,255,.04)', drawBorder: false },
-    ticks: {
-      color: COLOR.textSec,
-      font: { family: 'DM Sans', size: 11 },
-      callback: (v) => fmtNum(v),
-    },
-    border: { display: false },
-  };
+  return { grid: { color: 'rgba(255,255,255,.04)', drawBorder: false },
+           ticks: { color: COLOR.textSec, font: { family: 'DM Sans', size: 11 },
+                    callback: (v) => fmtNum(v) },
+           border: { display: false } };
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   REFRESH MANUAL — clique no botão para atualizar
+   REFRESH MANUAL
    ════════════════════════════════════════════════════════════════════ */
 function setupManualRefresh() {
   const btn = document.getElementById('refreshIndicator');
@@ -402,30 +367,23 @@ function setupManualRefresh() {
   });
 }
 
-
 /* ════════════════════════════════════════════════════════════════════
    UI HELPERS
    ════════════════════════════════════════════════════════════════════ */
-
-// Count-up animado
 function countUp(elId, target) {
   const el = document.getElementById(elId);
   if (!el) return;
-  const start    = 0;
-  const duration = 900;
-  const startTs  = performance.now();
-
+  const start = 0, duration = 900, startTs = performance.now();
   function step(ts) {
-    const progress = Math.min((ts - startTs) / duration, 1);
-    const ease     = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-    el.textContent = fmtNum(Math.floor(ease * target));
+    const progress = Math.min((ts - startTs)/duration, 1);
+    const ease = 1 - Math.pow(1 - progress, 3);
+    el.textContent = fmtNum(Math.floor(ease*target));
     if (progress < 1) requestAnimationFrame(step);
     else el.textContent = fmtNum(target);
   }
   requestAnimationFrame(step);
 }
 
-// Formata números: 1.234.567
 function fmtNum(n) {
   if (typeof n !== 'number') return n ?? '—';
   return n.toLocaleString('pt-BR');
@@ -450,13 +408,9 @@ function updateFooter(json) {
 
 function showError(msg) {
   console.error('[Dashboard Error]', msg);
-  // Mostra um toast ou banner de erro sem quebrar o layout
   const footer = document.querySelector('.page-footer');
   if (footer) {
     footer.style.color = '#ff4d6d';
     document.getElementById('lastUpdate').textContent = `⚠️ Erro ao carregar: ${msg}`;
   }
 }
-
-
-console.log(process.env.GOOGLE_APPLICATION_CREDENTIALS);
