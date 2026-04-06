@@ -17,9 +17,9 @@ const state = {
 
 // Se aberto via file:// ou porta diferente, usa mock embutido
 const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
-const API_BASE = process.env.NODE_ENV === 'production'
-  ? 'https://api-meusite.onrender.com'
-  : window.location.origin;
+const API_BASE = IS_FILE_PROTOCOL
+  ? window.location.origin
+  : 'https://dashboardportal.onrender.com';
 
 /* ── Paleta compartilhada com o CSS ──────────────────────────────── */
 const COLOR = {
@@ -42,8 +42,24 @@ const SOURCE_COLORS = [COLOR.primary, COLOR.cyan, COLOR.green, COLOR.purple, COL
    INICIALIZAÇÃO
    ════════════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
-  setupPeriodFilter();
-  setupManualRefresh();
+  const today = new Date();
+
+  switch(state.period) {
+    case '7days':
+      state.endDate = today.toISOString().slice(0,10);
+      state.startDate = new Date(today.getTime() - 7*24*60*60*1000).toISOString().slice(0,10);
+      break;
+    case '30days':
+      state.endDate = today.toISOString().slice(0,10);
+      state.startDate = new Date(today.getTime() - 30*24*60*60*1000).toISOString().slice(0,10);
+      break;
+    case 'thisMonth':
+      state.startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10);
+      state.endDate = today.toISOString().slice(0,10);
+      break;
+  }
+
+  // Chama fetch inicial
   fetchAndRender();
 });
 
@@ -92,8 +108,15 @@ async function fetchAndRender() {
   setRefreshRing(true);
 
   try {
-    const params = buildQueryParams();
-    const res  = await fetch(`${API_BASE}/api/analytics?${params}`);
+    const body = { period: state.period };
+if (state.startDate) body.startDate = state.startDate;
+if (state.endDate)   body.endDate   = state.endDate;
+
+const res = await fetch(`${API_BASE}/api/analytics`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
 
