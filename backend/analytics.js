@@ -82,10 +82,18 @@ function getMockData(dateRange) {
 // ── Integração Real com GA4 ────────────────────────────────────────────────────
 async function getRealData(dateRange) {
   const { BetaAnalyticsDataClient } = require('@google-analytics/data');
+const path = require('path');
 
-  // Autenticação via GOOGLE_APPLICATION_CREDENTIALS (variável de ambiente)
-  const analyticsDataClient = new BetaAnalyticsDataClient();
-  const propertyId = process.env.GA4_PROPERTY_ID;
+const analyticsDataClient = new BetaAnalyticsDataClient({
+  keyFilename: path.resolve(process.env.GOOGLE_APPLICATION_CREDENTIALS),
+});
+
+const propertyId = process.env.GA4_PROPERTY_ID;
+
+  if (!propertyId) {
+    throw new Error('GA4_PROPERTY_ID não está definido no .env');
+  }
+  
 
   // ── Requisição 1: Métricas gerais ──────────────────────────────────────────
   const [summaryResponse] = await analyticsDataClient.runReport({
