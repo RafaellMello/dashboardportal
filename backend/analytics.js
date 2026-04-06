@@ -90,7 +90,6 @@ function getMockData(dateRange) {
 // ── Integração Real com GA4 ────────────────────────────────────────────────────
 async function getRealData(dateRange) {
   const { BetaAnalyticsDataClient } = require('@google-analytics/data');
-  const { BetaAnalyticsDataClient } = require('@google-analytics/data');
 const { GoogleAuth } = require('google-auth-library');
 
 // pega o caminho do secret do Render
