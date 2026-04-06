@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal do Contribuinte — Analytics</title>
+
+  <!-- Fontes premium -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── Noise texture overlay ──────────────────────────────────── -->
+  <div class="noise-overlay"></div>
+
+  <!-- ── Sidebar ────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" fill="currentColor" opacity=".9"/>
+        </svg>
+      </div>
+      <div>
+        <span class="logo-title">Portal</span>
+        <span class="logo-sub">Contribuinte</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Visão Geral
+      </a>
+      <a href="#" class="nav-item">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+        Tráfego
+      </a>
+      <a href="#" class="nav-item">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Páginas
+      </a>
+      <a href="#" class="nav-item">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Usuários
+      </a>
+      <a href="#" class="nav-item">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        Relatórios
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="status-dot"></div>
+      <span>API Conectada</span>
+    </div>
+  </aside>
+
+  <!-- ── Main ───────────────────────────────────────────────────── -->
+  <main class="main">
+
+    <!-- Header -->
+    <header class="page-header">
+      <div class="header-left">
+        <h1 class="page-title">Analytics Dashboard</h1>
+        <p class="page-subtitle">Portal do Contribuinte · Prefeitura Municipal</p>
+      </div>
+
+      <div class="header-right">
+        <!-- Filtro de período -->
+        <div class="period-filter">
+          <button class="period-btn" data-period="7days">7 dias</button>
+          <button class="period-btn active" data-period="30days">30 dias</button>
+          <button class="period-btn" data-period="thisMonth">Este mês</button>
+          <button class="period-btn" data-period="custom" id="customBtn">Personalizado</button>
+        </div>
+
+        <!-- Date picker personalizado (oculto por default) -->
+        <div class="custom-date" id="customDatePicker" style="display:none;">
+          <input type="date" id="startDate" class="date-input" />
+          <span>→</span>
+          <input type="date" id="endDate" class="date-input" />
+          <button class="apply-btn" id="applyCustomDate">Aplicar</button>
+        </div>
+
+        <!-- Botão de atualização manual -->
+        <div class="refresh-indicator" id="refreshIndicator" title="Clique para atualizar">
+          <div class="refresh-ring"></div>
+          <span>Atualizar</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── Skeleton / Loading ──────────────────────────────── -->
+    <div id="skeleton" class="skeleton-grid" style="display:none;">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>
+
+    <!-- ── Conteúdo real ───────────────────────────────────── -->
+    <div id="dashContent">
+
+      <!-- Cards de métricas -->
+      <section class="metrics-grid">
+        <div class="metric-card" id="card-sessions">
+          <div class="metric-icon sessions-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+          </div>
+          <div class="metric-body">
+            <span class="metric-label">Total de Sessões</span>
+            <span class="metric-value" id="totalSessions">—</span>
+            <span class="metric-growth" id="growthRate">—</span>
+          </div>
+          <div class="metric-spark" id="sparkSessions"></div>
+        </div>
+
+        <div class="metric-card" id="card-users">
+          <div class="metric-icon users-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          </div>
+          <div class="metric-body">
+            <span class="metric-label">Usuários Únicos</span>
+            <span class="metric-value" id="uniqueUsers">—</span>
+            <span class="metric-tag">mês atual</span>
+          </div>
+        </div>
+
+        <div class="metric-card" id="card-pageviews">
+          <div class="metric-icon pages-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="metric-body">
+            <span class="metric-label">Visualizações</span>
+            <span class="metric-value" id="pageviews">—</span>
+            <span class="metric-tag">páginas vistas</span>
+          </div>
+        </div>
+
+        <div class="metric-card" id="card-duration">
+          <div class="metric-icon duration-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="metric-body">
+            <span class="metric-label">Tempo Médio</span>
+            <span class="metric-value" id="avgDuration">—</span>
+            <span class="metric-tag">por sessão</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Gráficos principais -->
+      <section class="charts-row">
+
+        <!-- Gráfico de linha: tendência mensal -->
+        <div class="chart-card chart-main">
+          <div class="chart-header">
+            <div>
+              <h2 class="chart-title">Acessos Mês a Mês</h2>
+              <p class="chart-desc">Sessões e usuários únicos nos últimos 12 meses</p>
+            </div>
+            <div class="chart-legend">
+              <span class="legend-dot sessions"></span><span>Sessões</span>
+              <span class="legend-dot users"></span><span>Usuários</span>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Gráfico de pizza: origem de tráfego -->
+        <div class="chart-card chart-side">
+          <div class="chart-header">
+            <div>
+              <h2 class="chart-title">Origem do Tráfego</h2>
+              <p class="chart-desc">Distribuição por canal</p>
+            </div>
+          </div>
+          <div class="chart-wrap donut-wrap">
+            <canvas id="sourceChart"></canvas>
+          </div>
+          <div class="source-legend" id="sourceLegend"></div>
+        </div>
+
+      </section>
+
+      <!-- Gráfico de barras: top páginas -->
+      <section class="charts-row">
+        <div class="chart-card chart-full">
+          <div class="chart-header">
+            <div>
+              <h2 class="chart-title">Páginas Mais Acessadas</h2>
+              <p class="chart-desc">Ranking por visualizações de página</p>
+            </div>
+          </div>
+          <div class="chart-wrap bar-wrap">
+            <canvas id="pagesChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Comparativo mês a mês -->
+        <div class="chart-card chart-compare">
+          <div class="chart-header">
+            <div>
+              <h2 class="chart-title">Comparativo</h2>
+              <p class="chart-desc">Mês atual vs anterior</p>
+            </div>
+          </div>
+          <div class="comparison-body" id="comparisonBody">
+            <div class="compare-item">
+              <span class="compare-label" id="curLabel">—</span>
+              <div class="compare-bar-wrap">
+                <div class="compare-bar current" id="curBar" style="width:0%"></div>
+              </div>
+              <span class="compare-val" id="curVal">—</span>
+            </div>
+            <div class="compare-item">
+              <span class="compare-label" id="prevLabel">—</span>
+              <div class="compare-bar-wrap">
+                <div class="compare-bar previous" id="prevBar" style="width:0%"></div>
+              </div>
+              <span class="compare-val" id="prevVal">—</span>
+            </div>
+            <div class="compare-growth" id="compareGrowth">—</div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /dashContent -->
+
+    <!-- Footer -->
+    <footer class="page-footer">
+      <span id="lastUpdate">Última atualização: —</span>
+      <span id="dataSource">Desenvolvido por: Rafael Mello (https://rafaelmello.site) Fonte: —</span>
+    </footer>
+
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
