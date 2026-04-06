@@ -1,6 +1,6 @@
 /**
  * script.js — Dashboard Analytics Portal do Contribuinte
- * Consome /api/analytics e renderiza gráficos com Chart.js
+ * Consome /api/analytics via POST e renderiza gráficos com Chart.js
  */
 
 /* ── Estado global ───────────────────────────────────────────────── */
@@ -90,7 +90,7 @@ function setupPeriodFilter() {
     const s = document.getElementById('startDate').value;
     const e = document.getElementById('endDate').value;
     if (!s || !e) return alert('Selecione data de início e fim.');
-    if (s > e)    return alert('Data de início não pode ser maior que a data final.');
+    if (s > e) return alert('Data de início não pode ser maior que a data final.');
     state.period = 'custom';
     state.startDate = s;
     state.endDate   = e;
@@ -99,19 +99,23 @@ function setupPeriodFilter() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   FETCH PRINCIPAL (AGORA GET COM QUERY STRING)
+   FETCH PRINCIPAL (AGORA POST)
    ════════════════════════════════════════════════════════════════════ */
 async function fetchAndRender() {
   if (state.firstLoad) showSkeleton(true);
   setRefreshRing(true);
 
   try {
-    const params = new URLSearchParams({ period: state.period });
-    if (state.startDate) params.set('startDate', state.startDate);
-    if (state.endDate)   params.set('endDate',   state.endDate);
-    const url = `${API_BASE}/api/analytics?${params.toString()}`;
+    const body = { period: state.period };
+    if (state.startDate) body.startDate = state.startDate;
+    if (state.endDate)   body.endDate   = state.endDate;
 
-    const res = await fetch(url); // GET por padrão
+    const res = await fetch(`${API_BASE}/api/analytics`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
 
