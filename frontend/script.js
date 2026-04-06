@@ -17,9 +17,7 @@ const state = {
 
 // Se aberto via file:// ou porta diferente, usa mock embutido
 const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
-const API_BASE = IS_FILE_PROTOCOL
-  ? window.location.origin
-  : 'https://dashboardportal.onrender.com';
+const API_BASE = window.location.origin;
 
 /* ── Paleta compartilhada com o CSS ──────────────────────────────── */
 const COLOR = {

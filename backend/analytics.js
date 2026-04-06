@@ -90,6 +90,20 @@ function getMockData(dateRange) {
 // ── Integração Real com GA4 ────────────────────────────────────────────────────
 async function getRealData(dateRange) {
   const { BetaAnalyticsDataClient } = require('@google-analytics/data');
+  const { BetaAnalyticsDataClient } = require('@google-analytics/data');
+const { GoogleAuth } = require('google-auth-library');
+
+// pega o caminho do secret do Render
+const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+// inicializa a autenticação
+const auth = new GoogleAuth({
+  keyFile: credentialsPath,
+  scopes: ['https://www.googleapis.com/auth/analytics.readonly'],
+});
+
+// inicializa o cliente GA4
+const analyticsClient = new BetaAnalyticsDataClient({ auth });
 const path = require('path');
 
 const analyticsDataClient = new BetaAnalyticsDataClient({
@@ -104,7 +118,7 @@ const propertyId = process.env.GA4_PROPERTY_ID;
   
 
   // ── Requisição 1: Métricas gerais ──────────────────────────────────────────
-  const [summaryResponse] = await analyticsDataClient.runReport({
+  const [summaryResponse] = await analyticsClient.runReport({
     property: `properties/${propertyId}`,
     dateRanges: [{ startDate: dateRange.startDate, endDate: dateRange.endDate }],
     metrics: [
@@ -124,7 +138,7 @@ const propertyId = process.env.GA4_PROPERTY_ID;
   const avgDurMin  = `${Math.floor(avgDur / 60)}m ${Math.floor(avgDur % 60)}s`;
 
   // ── Requisição 2: Tendência mensal ─────────────────────────────────────────
-  const [trendResponse] = await analyticsDataClient.runReport({
+  const [trendResponse] = await analyticsClient.runReport({
     property: `properties/${propertyId}`,
     dateRanges: [{ startDate: '365daysAgo', endDate: 'today' }],
     dimensions: [{ name: 'yearMonth' }],
@@ -147,7 +161,7 @@ const propertyId = process.env.GA4_PROPERTY_ID;
   });
 
   // ── Requisição 3: Top páginas ──────────────────────────────────────────────
-  const [pagesResponse] = await analyticsDataClient.runReport({
+  const [pagesResponse] = await analyticsClient.runReport({
     property: `properties/${propertyId}`,
     dateRanges: [{ startDate: dateRange.startDate, endDate: dateRange.endDate }],
     dimensions: [{ name: 'pageTitle' }],
@@ -163,7 +177,7 @@ const propertyId = process.env.GA4_PROPERTY_ID;
   }));
 
   // ── Requisição 4: Origem de tráfego ───────────────────────────────────────
-  const [sourceResponse] = await analyticsDataClient.runReport({
+  const [sourceResponse] = await analyticsClient.runReport({
     property: `properties/${propertyId}`,
     dateRanges: [{ startDate: dateRange.startDate, endDate: dateRange.endDate }],
     dimensions: [{ name: 'sessionDefaultChannelGroup' }],
