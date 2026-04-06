@@ -36,13 +36,12 @@ function getMockData(dateRange) {
   return {
     // Cards do topo
     summary: {
-      totalSessions:   currentMonth.sessions,
-      uniqueUsers:     currentMonth.users,
-      pageviews:       currentMonth.pageviews,
-      avgSessionDuration: '3m 42s',
-      bounceRate:      '38.4%',
-      growthRate:      `${growthRate > 0 ? '+' : ''}${growthRate}%`,
-    },
+  totalAccesses: pageviews, // 🔥 principal
+  sessions,
+  avgSessionDuration: avgDurMin,
+  bounceRate: `${(bounce * 100).toFixed(1)}%`,
+  growthRate: `${growth > 0 ? '+' : ''}${growth}%`,
+},
 
     // Gráfico de linha — mês a mês
     monthlyTrend: monthlyData,
@@ -100,20 +99,18 @@ const propertyId = process.env.GA4_PROPERTY_ID;
     property: `properties/${propertyId}`,
     dateRanges: [{ startDate: dateRange.startDate, endDate: dateRange.endDate }],
     metrics: [
-      { name: 'sessions' },
-      { name: 'activeUsers' },
-      { name: 'screenPageViews' },
-      { name: 'averageSessionDuration' },
-      { name: 'bounceRate' },
-    ],
+  { name: 'screenPageViews' }, // ACESSOS (principal)
+  { name: 'sessions' },        // opcional
+  { name: 'averageSessionDuration' },
+  { name: 'bounceRate' },
+],
   });
 
   const summaryRow = summaryResponse.rows?.[0]?.metricValues || [];
-  const sessions   = parseInt(summaryRow[0]?.value || 0);
-  const users      = parseInt(summaryRow[1]?.value || 0);
-  const pageviews  = parseInt(summaryRow[2]?.value || 0);
-  const avgDur     = parseFloat(summaryRow[3]?.value || 0);
-  const bounce     = parseFloat(summaryRow[4]?.value || 0);
+  const pageviews  = parseInt(summaryRow[0]?.value || 0);
+  const sessions   = parseInt(summaryRow[1]?.value || 0);
+  const avgDur     = parseFloat(summaryRow[2]?.value || 0);
+  const bounce     = parseFloat(summaryRow[3]?.value || 0);
 
   const avgDurMin  = `${Math.floor(avgDur / 60)}m ${Math.floor(avgDur % 60)}s`;
 
@@ -123,10 +120,8 @@ const propertyId = process.env.GA4_PROPERTY_ID;
     dateRanges: [{ startDate: '365daysAgo', endDate: 'today' }],
     dimensions: [{ name: 'yearMonth' }],
     metrics: [
-      { name: 'sessions' },
-      { name: 'activeUsers' },
-      { name: 'screenPageViews' },
-    ],
+  { name: 'screenPageViews' },
+],
     orderBys: [{ dimension: { dimensionName: 'yearMonth' } }],
   });
 
@@ -136,12 +131,10 @@ const propertyId = process.env.GA4_PROPERTY_ID;
     const month = months[parseInt(ym.slice(4, 6)) - 1];
     const year  = parseInt(ym.slice(0, 4));
     return {
-      month,
-      year,
-      sessions:  parseInt(row.metricValues[0].value),
-      users:     parseInt(row.metricValues[1].value),
-      pageviews: parseInt(row.metricValues[2].value),
-    };
+  month,
+  year,
+  accesses: parseInt(row.metricValues[0].value),
+};
   });
 
   // ── Requisição 3: Top páginas ──────────────────────────────────────────────
@@ -183,27 +176,26 @@ const propertyId = process.env.GA4_PROPERTY_ID;
   // ── Comparativo com mês anterior ──────────────────────────────────────────
   const last   = monthlyTrend[monthlyTrend.length - 1];
   const prev   = monthlyTrend[monthlyTrend.length - 2];
-  const growth = prev ? (((last.sessions - prev.sessions) / prev.sessions) * 100).toFixed(1) : '0';
+  const growth = prev ? (((last.accesses - prev.accesses) / prev.accesses) * 100).toFixed(1) : '0';
 
   return {
-    summary: {
-      totalSessions: sessions,
-      uniqueUsers:   users,
-      pageviews,
-      avgSessionDuration: avgDurMin,
-      bounceRate:    `${(bounce * 100).toFixed(1)}%`,
-      growthRate:    `${growth > 0 ? '+' : ''}${growth}%`,
-    },
-    monthlyTrend,
-    topPages,
-    trafficSources,
-    comparison: {
-      current:  { label: last?.month,  value: last?.sessions },
-      previous: { label: prev?.month,  value: prev?.sessions },
-      growth,
-    },
-    meta: { source: 'ga4', dateRange },
-  };
+  summary: {
+    totalAccesses: pageviews,
+    sessions,
+    avgSessionDuration: avgDurMin,
+    bounceRate: `${(bounce * 100).toFixed(1)}%`,
+    growthRate: `${growth > 0 ? '+' : ''}${growth}%`,
+  },
+  monthlyTrend,
+  topPages,
+  trafficSources,
+  comparison: {
+    current:  { label: last?.month,  value: last?.accesses },
+    previous: { label: prev?.month,  value: prev?.accesses },
+    growth,
+  },
+  meta: { source: 'ga4', dateRange },
+};
 }
 
 // ── Exportação principal ───────────────────────────────────────────────────────
