@@ -85,7 +85,7 @@ async function getRealData(dateRange) {
 const path = require('path');
 
 const analyticsDataClient = new BetaAnalyticsDataClient({
-  keyFilename: path.resolve(process.env.GOOGLE_APPLICATION_CREDENTIALS),
+  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
 });
 
 const propertyId = process.env.GA4_PROPERTY_ID;
