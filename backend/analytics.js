@@ -90,31 +90,21 @@ function getMockData(dateRange) {
 // ── Integração Real com GA4 ────────────────────────────────────────────────────
 async function getRealData(dateRange) {
   const { BetaAnalyticsDataClient } = require('@google-analytics/data');
-const { GoogleAuth } = require('google-auth-library');
 
-// pega o caminho do secret do Render
-const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  const propertyId = process.env.GA4_PROPERTY_ID;
+  if (!propertyId) {
+    throw new Error('GA4_PROPERTY_ID não está definido no .env');
+  }
 
-// inicializa a autenticação
-const auth = new GoogleAuth({
-  keyFile: credentialsPath,
-  scopes: ['https://www.googleapis.com/auth/analytics.readonly'],
-});
-
-// inicializa o cliente GA4
-const analyticsClient = new BetaAnalyticsDataClient({ auth });
+  // inicializa o cliente GA4 usando a service account
+  const analyticsClient = new BetaAnalyticsDataClient({
+    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS, // /etc/secrets/credentials.json
+  });
 const path = require('path');
 
 const analyticsDataClient = new BetaAnalyticsDataClient({
   keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
 });
-
-const propertyId = process.env.GA4_PROPERTY_ID;
-
-  if (!propertyId) {
-    throw new Error('GA4_PROPERTY_ID não está definido no .env');
-  }
-  
 
   // ── Requisição 1: Métricas gerais ──────────────────────────────────────────
   const [summaryResponse] = await analyticsClient.runReport({
