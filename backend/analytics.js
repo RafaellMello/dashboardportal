@@ -5,6 +5,10 @@
  * usa a API real. Caso contrário, retorna dados mockados para desenvolvimento.
  */
 
+const fs = require('fs');
+
+console.log('EXISTE JSON?', fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS));
+
 const USE_MOCK = !process.env.GA4_PROPERTY_ID; // troca para false quando configurar o GA4
 
 // ── Dados Mockados ─────────────────────────────────────────────────────────────

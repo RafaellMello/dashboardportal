@@ -436,3 +436,6 @@ function showError(msg) {
     document.getElementById('lastUpdate').textContent = `⚠️ Erro ao carregar: ${msg}`;
   }
 }
+
+
+console.log(process.env.GOOGLE_APPLICATION_CREDENTIALS);
