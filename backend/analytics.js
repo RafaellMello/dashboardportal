@@ -5,84 +5,60 @@
  * usa a API real. Caso contrário, retorna dados mockados para desenvolvimento.
  */
 
-const fs = require('fs');
-
-console.log('[DEBUG] GOOGLE_APPLICATION_CREDENTIALS:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
-console.log('[DEBUG] JSON existe?', fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS));
-
-try {
-  const content = fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8');
-  console.log('[DEBUG] Conteúdo parcial:', content.slice(0, 100)); // mostra só os 100 primeiros caracteres
-} catch (err) {
-  console.error('[DEBUG] Erro ao ler JSON:', err.message);
-}
-
-
-const USE_MOCK = !process.env.GA4_PROPERTY_ID; // troca para false quando configurar o GA4
+const USE_MOCK = !process.env.GA4_PROPERTY_ID;
 
 // ── Dados Mockados ─────────────────────────────────────────────────────────────
 function getMockData(dateRange) {
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const now = new Date();
 
-  // Gera série temporal dos últimos 12 meses
   const monthlyData = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
     const base = 18000 + Math.floor(Math.random() * 12000);
     return {
       month: months[d.getMonth()],
       year: d.getFullYear(),
+      accesses: Math.floor(base * 2.3),
       sessions: base,
       users: Math.floor(base * 0.74),
-      pageviews: Math.floor(base * 2.3),
     };
   });
 
   const currentMonth = monthlyData[monthlyData.length - 1];
   const prevMonth    = monthlyData[monthlyData.length - 2];
-  const growthRate   = (((currentMonth.sessions - prevMonth.sessions) / prevMonth.sessions) * 100).toFixed(1);
+  const growthRate   = (((currentMonth.accesses - prevMonth.accesses) / prevMonth.accesses) * 100).toFixed(1);
 
   return {
-    // Cards do topo
     summary: {
-  totalAccesses: pageviews, // 🔥 principal
-  sessions,
-  avgSessionDuration: avgDurMin,
-  bounceRate: `${(bounce * 100).toFixed(1)}%`,
-  growthRate: `${growth > 0 ? '+' : ''}${growth}%`,
-},
-
-    // Gráfico de linha — mês a mês
-    monthlyTrend: monthlyData,
-
-    // Gráfico de barras — páginas mais acessadas
-    topPages: [
-      { page: 'IPTU',             pageviews: 14830, sessions: 9241 },
-      { page: 'Home',             pageviews: 12540, sessions: 8102 },
-      { page: 'NFSe',             pageviews:  9870, sessions: 6730 },
-      { page: 'ISS',              pageviews:  7650, sessions: 5210 },
-      { page: 'Certidões',        pageviews:  6320, sessions: 4180 },
-      { page: 'ITBI',             pageviews:  5140, sessions: 3420 },
-      { page: 'Alvará',           pageviews:  3980, sessions: 2760 },
-      { page: 'Taxa de Licença',  pageviews:  2710, sessions: 1930 },
-    ],
-
-    // Gráfico de pizza — origem de tráfego
-    trafficSources: [
-      { source: 'Orgânico',  sessions: 12840, percentage: 43.2 },
-      { source: 'Direto',    sessions:  8910, percentage: 30.0 },
-      { source: 'Referência',sessions:  4320, percentage: 14.5 },
-      { source: 'Social',    sessions:  2180, percentage:  7.3 },
-      { source: 'E-mail',    sessions:  1510, percentage:  5.0 },
-    ],
-
-    // Comparativo mês anterior
-    comparison: {
-      current:  { label: months[now.getMonth()],       value: currentMonth.sessions },
-      previous: { label: months[(now.getMonth() + 11) % 12], value: prevMonth.sessions },
-      growth:   growthRate,
+      totalAccesses: currentMonth.accesses,
+      sessions:      currentMonth.sessions,
+      avgSessionDuration: '3m 22s',
+      bounceRate: '41.5%',
+      growthRate: `${growthRate > 0 ? '+' : ''}${growthRate}%`,
     },
-
+    monthlyTrend: monthlyData,
+    topPages: [
+      { page: 'IPTU',            pageviews: 14830, sessions: 9241 },
+      { page: 'Home',            pageviews: 12540, sessions: 8102 },
+      { page: 'NFSe',            pageviews:  9870, sessions: 6730 },
+      { page: 'ISS',             pageviews:  7650, sessions: 5210 },
+      { page: 'Certidões',       pageviews:  6320, sessions: 4180 },
+      { page: 'ITBI',            pageviews:  5140, sessions: 3420 },
+      { page: 'Alvará',          pageviews:  3980, sessions: 2760 },
+      { page: 'Taxa de Licença', pageviews:  2710, sessions: 1930 },
+    ],
+    trafficSources: [
+      { source: 'Orgânico',   sessions: 12840, percentage: 43.2 },
+      { source: 'Direto',     sessions:  8910, percentage: 30.0 },
+      { source: 'Referência', sessions:  4320, percentage: 14.5 },
+      { source: 'Social',     sessions:  2180, percentage:  7.3 },
+      { source: 'E-mail',     sessions:  1510, percentage:  5.0 },
+    ],
+    comparison: {
+      current:  { label: currentMonth.month, value: currentMonth.accesses },
+      previous: { label: prevMonth.month,    value: prevMonth.accesses },
+      growth: growthRate,
+    },
     meta: { source: 'mock', dateRange },
   };
 }
@@ -92,38 +68,30 @@ async function getRealData(dateRange) {
   const { BetaAnalyticsDataClient } = require('@google-analytics/data');
 
   const propertyId = process.env.GA4_PROPERTY_ID;
-  if (!propertyId) {
-    throw new Error('GA4_PROPERTY_ID não está definido no .env');
-  }
+  if (!propertyId) throw new Error('GA4_PROPERTY_ID não está definido');
 
-  // inicializa o cliente GA4 usando a service account
+  // ← cliente único com keyFilename (parâmetro correto da biblioteca)
   const analyticsClient = new BetaAnalyticsDataClient({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS, // /etc/secrets/credentials.json
+    keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
   });
-const path = require('path');
-
-const analyticsDataClient = new BetaAnalyticsDataClient({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-});
 
   // ── Requisição 1: Métricas gerais ──────────────────────────────────────────
   const [summaryResponse] = await analyticsClient.runReport({
     property: `properties/${propertyId}`,
     dateRanges: [{ startDate: dateRange.startDate, endDate: dateRange.endDate }],
     metrics: [
-  { name: 'screenPageViews' }, // ACESSOS (principal)
-  { name: 'sessions' },        // opcional
-  { name: 'averageSessionDuration' },
-  { name: 'bounceRate' },
-],
+      { name: 'screenPageViews' },
+      { name: 'sessions' },
+      { name: 'averageSessionDuration' },
+      { name: 'bounceRate' },
+    ],
   });
 
   const summaryRow = summaryResponse.rows?.[0]?.metricValues || [];
-  const pageviews  = parseInt(summaryRow[0]?.value || 0);
-  const sessions   = parseInt(summaryRow[1]?.value || 0);
+  const pageviews  = parseInt(summaryRow[0]?.value  || 0);
+  const sessions   = parseInt(summaryRow[1]?.value  || 0);
   const avgDur     = parseFloat(summaryRow[2]?.value || 0);
   const bounce     = parseFloat(summaryRow[3]?.value || 0);
-
   const avgDurMin  = `${Math.floor(avgDur / 60)}m ${Math.floor(avgDur % 60)}s`;
 
   // ── Requisição 2: Tendência mensal ─────────────────────────────────────────
@@ -131,9 +99,7 @@ const analyticsDataClient = new BetaAnalyticsDataClient({
     property: `properties/${propertyId}`,
     dateRanges: [{ startDate: '365daysAgo', endDate: 'today' }],
     dimensions: [{ name: 'yearMonth' }],
-    metrics: [
-  { name: 'screenPageViews' },
-],
+    metrics: [{ name: 'screenPageViews' }],
     orderBys: [{ dimension: { dimensionName: 'yearMonth' } }],
   });
 
@@ -143,10 +109,10 @@ const analyticsDataClient = new BetaAnalyticsDataClient({
     const month = months[parseInt(ym.slice(4, 6)) - 1];
     const year  = parseInt(ym.slice(0, 4));
     return {
-  month,
-  year,
-  accesses: parseInt(row.metricValues[0].value),
-};
+      month,
+      year,
+      accesses: parseInt(row.metricValues[0].value),
+    };
   });
 
   // ── Requisição 3: Top páginas ──────────────────────────────────────────────
@@ -175,7 +141,9 @@ const analyticsDataClient = new BetaAnalyticsDataClient({
     limit: 6,
   });
 
-  const totalSessions = (sourceResponse.rows || []).reduce((s, r) => s + parseInt(r.metricValues[0].value), 0);
+  const totalSessions = (sourceResponse.rows || []).reduce(
+    (s, r) => s + parseInt(r.metricValues[0].value), 0
+  );
   const trafficSources = (sourceResponse.rows || []).map((row) => {
     const s = parseInt(row.metricValues[0].value);
     return {
@@ -188,32 +156,34 @@ const analyticsDataClient = new BetaAnalyticsDataClient({
   // ── Comparativo com mês anterior ──────────────────────────────────────────
   const last   = monthlyTrend[monthlyTrend.length - 1];
   const prev   = monthlyTrend[monthlyTrend.length - 2];
-  const growth = prev ? (((last.accesses - prev.accesses) / prev.accesses) * 100).toFixed(1) : '0';
+  const growth = prev
+    ? (((last.accesses - prev.accesses) / prev.accesses) * 100).toFixed(1)
+    : '0';
 
   return {
-  summary: {
-    totalAccesses: pageviews,
-    sessions,
-    avgSessionDuration: avgDurMin,
-    bounceRate: `${(bounce * 100).toFixed(1)}%`,
-    growthRate: `${growth > 0 ? '+' : ''}${growth}%`,
-  },
-  monthlyTrend,
-  topPages,
-  trafficSources,
-  comparison: {
-    current:  { label: last?.month,  value: last?.accesses },
-    previous: { label: prev?.month,  value: prev?.accesses },
-    growth,
-  },
-  meta: { source: 'ga4', dateRange },
-};
+    summary: {
+      totalAccesses: pageviews,
+      sessions,
+      avgSessionDuration: avgDurMin,
+      bounceRate: `${(bounce * 100).toFixed(1)}%`,
+      growthRate: `${parseFloat(growth) > 0 ? '+' : ''}${growth}%`,
+    },
+    monthlyTrend,
+    topPages,
+    trafficSources,
+    comparison: {
+      current:  { label: last?.month, value: last?.accesses },
+      previous: { label: prev?.month, value: prev?.accesses },
+      growth,
+    },
+    meta: { source: 'ga4', dateRange },
+  };
 }
 
 // ── Exportação principal ───────────────────────────────────────────────────────
 async function getAnalyticsData(dateRange) {
   if (USE_MOCK) {
-    console.log('[Analytics] ⚠️  Usando dados MOCKADOS (configure GA4_PROPERTY_ID para dados reais)');
+    console.log('[Analytics] ⚠️  Usando dados MOCKADOS');
     return getMockData(dateRange);
   }
   console.log('[Analytics] ✅  Buscando dados reais do GA4...');
