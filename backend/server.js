@@ -5,11 +5,11 @@
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 
-const express = require('express');
-const cors    = require('cors');
-const path    = require('path');
-const fs      = require('fs');
-const { getAnalyticsData } = require('./analytics');
+const express          = require('express');
+const cors             = require('cors');
+const path             = require('path');
+const fs               = require('fs');
+const analyticsModule  = require('./analytics');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -26,7 +26,7 @@ async function handleAnalytics(req, res) {
   try {
     const { period = '30days', startDate, endDate } = { ...req.query, ...req.body };
     const dateRange = resolveDateRange(period, startDate, endDate);
-    const data = await getAnalyticsData(dateRange);
+    const data = await analyticsModule.getAnalyticsData(dateRange);
     res.json({ success: true, data, generatedAt: new Date().toISOString() });
   } catch (err) {
     console.error('[API Error]', err.message);
@@ -43,9 +43,8 @@ app.get('/api/health', (_req, res) => {
 });
 
 // ── Debug ─────────────────────────────────────────────────────────────────────
-app.get('/api/debug', (req, res) => {
+app.get('/api/debug', (_req, res) => {
   const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-
   let fileInfo = { exists: false, content: null, error: null };
   try {
     fileInfo.exists = fs.existsSync(credPath);
@@ -60,12 +59,7 @@ app.get('/api/debug', (req, res) => {
   } catch (e) {
     fileInfo.error = e.message;
   }
-
-  res.json({
-    credPath,
-    ga4PropertyId: process.env.GA4_PROPERTY_ID,
-    ...fileInfo,
-  });
+  res.json({ credPath, ga4PropertyId: process.env.GA4_PROPERTY_ID, ...fileInfo });
 });
 
 // ── Helper: resolve datas a partir do período ─────────────────────────────────
