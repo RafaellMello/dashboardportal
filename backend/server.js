@@ -82,3 +82,31 @@ app.listen(PORT, () => {
   console.log(`\n🚀 Dashboard rodando em http://localhost:${PORT}`);
   console.log(`📊 API disponível em http://localhost:${PORT}/api/analytics\n`);
 });
+
+
+app.get('/api/debug', (req, res) => {
+  const fs = require('fs');
+  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  
+  let fileInfo = { exists: false, content: null, error: null };
+  try {
+    fileInfo.exists = fs.existsSync(credPath);
+    if (fileInfo.exists) {
+      const raw = fs.readFileSync(credPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      fileInfo.content = {
+        type: parsed.type,
+        client_email: parsed.client_email,
+        project_id: parsed.project_id,
+      };
+    }
+  } catch (e) {
+    fileInfo.error = e.message;
+  }
+
+  res.json({
+    credPath,
+    ga4PropertyId: process.env.GA4_PROPERTY_ID,
+    ...fileInfo,
+  });
+});
