@@ -70,9 +70,10 @@ async function getRealData(dateRange) {
   const propertyId = process.env.GA4_PROPERTY_ID;
   if (!propertyId) throw new Error('GA4_PROPERTY_ID não está definido');
 
-  const keyFile = JSON.parse(
-    fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8')
-  );
+  const keyFile = JSON.parse(fs.readFileSync('/etc/secrets/credentials.json', 'utf8'));
+console.log(keyFile.private_key);
+
+  
 
   const client = new BetaAnalyticsDataClient({
     credentials: {
