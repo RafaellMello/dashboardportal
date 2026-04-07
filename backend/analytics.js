@@ -1,193 +1,105 @@
 /**
- * analytics.js — Integração com Google Analytics Data API (GA4)
- *
- * Se GA4_PROPERTY_ID e GOOGLE_APPLICATION_CREDENTIALS estiverem configurados,
- * usa a API real. Caso contrário, retorna dados mockados para desenvolvimento.
+ * Portal do Contribuinte — Analytics Dashboard
+ * Backend: Express + Google Analytics Data API (GA4)
  */
 
-const USE_MOCK = !process.env.GA4_PROPERTY_ID;
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 
-// ── Dados Mockados ─────────────────────────────────────────────────────────────
-function getMockData(dateRange) {
-  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const now = new Date();
+const express = require('express');
+const cors    = require('cors');
+const path    = require('path');
+const fs      = require('fs');
+const { getAnalyticsData } = require('./analytics');
 
-  const monthlyData = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
-    const base = 18000 + Math.floor(Math.random() * 12000);
-    return {
-      month: months[d.getMonth()],
-      year: d.getFullYear(),
-      accesses: Math.floor(base * 2.3),
-      sessions: base,
-      users: Math.floor(base * 0.74),
-    };
-  });
+const app  = express();
+const PORT = process.env.PORT || 3000;
 
-  const currentMonth = monthlyData[monthlyData.length - 1];
-  const prevMonth    = monthlyData[monthlyData.length - 2];
-  const growthRate   = (((currentMonth.accesses - prevMonth.accesses) / prevMonth.accesses) * 100).toFixed(1);
+// ── Middlewares ────────────────────────────────────────────────────────────────
+app.use(cors());
+app.use(express.json());
 
-  return {
-    summary: {
-      totalAccesses: currentMonth.accesses,
-      sessions:      currentMonth.sessions,
-      avgSessionDuration: '3m 22s',
-      bounceRate: '41.5%',
-      growthRate: `${growthRate > 0 ? '+' : ''}${growthRate}%`,
-    },
-    monthlyTrend: monthlyData,
-    topPages: [
-      { page: 'IPTU',            pageviews: 14830, sessions: 9241 },
-      { page: 'Home',            pageviews: 12540, sessions: 8102 },
-      { page: 'NFSe',            pageviews:  9870, sessions: 6730 },
-      { page: 'ISS',             pageviews:  7650, sessions: 5210 },
-      { page: 'Certidões',       pageviews:  6320, sessions: 4180 },
-      { page: 'ITBI',            pageviews:  5140, sessions: 3420 },
-      { page: 'Alvará',          pageviews:  3980, sessions: 2760 },
-      { page: 'Taxa de Licença', pageviews:  2710, sessions: 1930 },
-    ],
-    trafficSources: [
-      { source: 'Orgânico',   sessions: 12840, percentage: 43.2 },
-      { source: 'Direto',     sessions:  8910, percentage: 30.0 },
-      { source: 'Referência', sessions:  4320, percentage: 14.5 },
-      { source: 'Social',     sessions:  2180, percentage:  7.3 },
-      { source: 'E-mail',     sessions:  1510, percentage:  5.0 },
-    ],
-    comparison: {
-      current:  { label: currentMonth.month, value: currentMonth.accesses },
-      previous: { label: prevMonth.month,    value: prevMonth.accesses },
-      growth: growthRate,
-    },
-    meta: { source: 'mock', dateRange },
-  };
-}
+// Serve o frontend estático
+app.use(express.static(path.join(__dirname, '../frontend')));
 
-// ── Integração Real com GA4 ────────────────────────────────────────────────────
-async function getRealData(dateRange) {
-  const { BetaAnalyticsDataClient } = require('@google-analytics/data');
-
-  const propertyId = process.env.GA4_PROPERTY_ID;
-  if (!propertyId) throw new Error('GA4_PROPERTY_ID não está definido');
-
-  // ← cliente único com keyFilename (parâmetro correto da biblioteca)
-  const analyticsClient = new BetaAnalyticsDataClient({
-    keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-  });
-
-  // ── Requisição 1: Métricas gerais ──────────────────────────────────────────
-  const [summaryResponse] = await analyticsClient.runReport({
-    property: `properties/${propertyId}`,
-    dateRanges: [{ startDate: dateRange.startDate, endDate: dateRange.endDate }],
-    metrics: [
-      { name: 'screenPageViews' },
-      { name: 'sessions' },
-      { name: 'averageSessionDuration' },
-      { name: 'bounceRate' },
-    ],
-  });
-
-  const summaryRow = summaryResponse.rows?.[0]?.metricValues || [];
-  const pageviews  = parseInt(summaryRow[0]?.value  || 0);
-  const sessions   = parseInt(summaryRow[1]?.value  || 0);
-  const avgDur     = parseFloat(summaryRow[2]?.value || 0);
-  const bounce     = parseFloat(summaryRow[3]?.value || 0);
-  const avgDurMin  = `${Math.floor(avgDur / 60)}m ${Math.floor(avgDur % 60)}s`;
-
-  // ── Requisição 2: Tendência mensal ─────────────────────────────────────────
-  const [trendResponse] = await analyticsClient.runReport({
-    property: `properties/${propertyId}`,
-    dateRanges: [{ startDate: '365daysAgo', endDate: 'today' }],
-    dimensions: [{ name: 'yearMonth' }],
-    metrics: [{ name: 'screenPageViews' }],
-    orderBys: [{ dimension: { dimensionName: 'yearMonth' } }],
-  });
-
-  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const monthlyTrend = (trendResponse.rows || []).map((row) => {
-    const ym    = row.dimensionValues[0].value; // "202401"
-    const month = months[parseInt(ym.slice(4, 6)) - 1];
-    const year  = parseInt(ym.slice(0, 4));
-    return {
-      month,
-      year,
-      accesses: parseInt(row.metricValues[0].value),
-    };
-  });
-
-  // ── Requisição 3: Top páginas ──────────────────────────────────────────────
-  const [pagesResponse] = await analyticsClient.runReport({
-    property: `properties/${propertyId}`,
-    dateRanges: [{ startDate: dateRange.startDate, endDate: dateRange.endDate }],
-    dimensions: [{ name: 'pageTitle' }],
-    metrics: [{ name: 'screenPageViews' }, { name: 'sessions' }],
-    orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
-    limit: 8,
-  });
-
-  const topPages = (pagesResponse.rows || []).map((row) => ({
-    page:      row.dimensionValues[0].value,
-    pageviews: parseInt(row.metricValues[0].value),
-    sessions:  parseInt(row.metricValues[1].value),
-  }));
-
-  // ── Requisição 4: Origem de tráfego ───────────────────────────────────────
-  const [sourceResponse] = await analyticsClient.runReport({
-    property: `properties/${propertyId}`,
-    dateRanges: [{ startDate: dateRange.startDate, endDate: dateRange.endDate }],
-    dimensions: [{ name: 'sessionDefaultChannelGroup' }],
-    metrics: [{ name: 'sessions' }],
-    orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-    limit: 6,
-  });
-
-  const totalSessions = (sourceResponse.rows || []).reduce(
-    (s, r) => s + parseInt(r.metricValues[0].value), 0
-  );
-  const trafficSources = (sourceResponse.rows || []).map((row) => {
-    const s = parseInt(row.metricValues[0].value);
-    return {
-      source:     row.dimensionValues[0].value,
-      sessions:   s,
-      percentage: parseFloat(((s / totalSessions) * 100).toFixed(1)),
-    };
-  });
-
-  // ── Comparativo com mês anterior ──────────────────────────────────────────
-  const last   = monthlyTrend[monthlyTrend.length - 1];
-  const prev   = monthlyTrend[monthlyTrend.length - 2];
-  const growth = prev
-    ? (((last.accesses - prev.accesses) / prev.accesses) * 100).toFixed(1)
-    : '0';
-
-  return {
-    summary: {
-      totalAccesses: pageviews,
-      sessions,
-      avgSessionDuration: avgDurMin,
-      bounceRate: `${(bounce * 100).toFixed(1)}%`,
-      growthRate: `${parseFloat(growth) > 0 ? '+' : ''}${growth}%`,
-    },
-    monthlyTrend,
-    topPages,
-    trafficSources,
-    comparison: {
-      current:  { label: last?.month, value: last?.accesses },
-      previous: { label: prev?.month, value: prev?.accesses },
-      growth,
-    },
-    meta: { source: 'ga4', dateRange },
-  };
-}
-
-// ── Exportação principal ───────────────────────────────────────────────────────
-async function getAnalyticsData(dateRange) {
-  if (USE_MOCK) {
-    console.log('[Analytics] ⚠️  Usando dados MOCKADOS');
-    return getMockData(dateRange);
+// ── Handler principal de analytics ───────────────────────────────────────────
+async function handleAnalytics(req, res) {
+  try {
+    const { period = '30days', startDate, endDate } = { ...req.query, ...req.body };
+    const dateRange = resolveDateRange(period, startDate, endDate);
+    const data = await getAnalyticsData(dateRange);
+    res.json({ success: true, data, generatedAt: new Date().toISOString() });
+  } catch (err) {
+    console.error('[API Error]', err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
-  console.log('[Analytics] ✅  Buscando dados reais do GA4...');
-  return getRealData(dateRange);
 }
 
-module.exports = { getAnalyticsData };
+app.get('/api/analytics',  handleAnalytics);
+app.post('/api/analytics', handleAnalytics);
+
+// ── Health check ──────────────────────────────────────────────────────────────
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ── Debug ─────────────────────────────────────────────────────────────────────
+app.get('/api/debug', (req, res) => {
+  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+  let fileInfo = { exists: false, content: null, error: null };
+  try {
+    fileInfo.exists = fs.existsSync(credPath);
+    if (fileInfo.exists) {
+      const parsed = JSON.parse(fs.readFileSync(credPath, 'utf8'));
+      fileInfo.content = {
+        type:         parsed.type,
+        client_email: parsed.client_email,
+        project_id:   parsed.project_id,
+      };
+    }
+  } catch (e) {
+    fileInfo.error = e.message;
+  }
+
+  res.json({
+    credPath,
+    ga4PropertyId: process.env.GA4_PROPERTY_ID,
+    ...fileInfo,
+  });
+});
+
+// ── Helper: resolve datas a partir do período ─────────────────────────────────
+function resolveDateRange(period, startDate, endDate) {
+  const today = new Date();
+  const fmt   = (d) => d.toISOString().split('T')[0];
+
+  switch (period) {
+    case '7days': {
+      const start = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000);
+      return { startDate: fmt(start), endDate: fmt(today) };
+    }
+    case '30days': {
+      const start = new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000);
+      return { startDate: fmt(start), endDate: fmt(today) };
+    }
+    case 'thisMonth': {
+      const first = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { startDate: fmt(first), endDate: fmt(today) };
+    }
+    case 'custom':
+      if (!startDate || !endDate) {
+        throw new Error('startDate e endDate são obrigatórios para period=custom');
+      }
+      return { startDate, endDate };
+    default: {
+      const start = new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000);
+      return { startDate: fmt(start), endDate: fmt(today) };
+    }
+  }
+}
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+app.listen(PORT, () => {
+  console.log(`\n🚀 Dashboard rodando em http://localhost:${PORT}`);
+  console.log(`📊 API disponível em http://localhost:${PORT}/api/analytics\n`);
+});
